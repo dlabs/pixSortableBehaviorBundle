@@ -1,10 +1,4 @@
 <?php
-/**
- * Created by JetBrains PhpStorm.
- * Author: Nicolas R.
- * Date: 27/09/2013
- * Time: 13:53
- */
 
 namespace Pix\SortableBehaviorBundle\Services;
 
@@ -12,6 +6,10 @@ use Doctrine\ORM\EntityManager;
 
 class PositionHandler
 {
+    const UP        = 'up';
+    const DOWN      = 'down';
+    const TOP       = 'top';
+    const BOTTOM    = 'bottom';
 
     /**
      *
@@ -71,5 +69,35 @@ class PositionHandler
         return 0;
     }
 
+    public function setPositions($entity, $id, $position, &$callerAdmin)
+    {
+        $reOrder = function($bumperId, $bumperPos, $bumpedId, $bumpedPos) use($callerAdmin) {
+            $bumper = $callerAdmin->getObject($bumperId);
+            $bumper->setPosition($bumperPos);
+            $callerAdmin->update($bumper);
 
+            $bumped = $callerAdmin->getObject($bumpedId);
+            $bumped->setPosition($bumpedPos);
+            $callerAdmin->update($bumped);
+        };
+
+        $query = $this->em->createQuery('SELECT m.id, m.position FROM '.$entity.' m ORDER BY m.position ASC');
+        $result = $query->getResult();
+
+        $remapped = [];
+        foreach ($result as $row) {
+            $remapped[$row['id']] = $row['position'];
+        }
+        $remapped1 = array_flip($remapped);
+
+        $moved =& $remapped[$id];
+        $last = sizeof($remapped)-1;
+        if ($position == self::DOWN && $moved + 1 <= $last) {
+            $reOrder($id, ++$moved, $remapped1[$moved], --$remapped[$remapped1[$moved]]);
+
+        } else if ($position == self::UP && $moved - 1 >= 0) {
+            $reOrder($id, --$moved, $remapped1[$moved], ++$remapped[$remapped1[$moved]]);
+        }
+
+    }
 }
